@@ -1,0 +1,83 @@
+
+local hx = require "scripts.hashes"
+
+local function refresh(self)
+	gui.set_text(gui.get_node("MessageBoxCaption"), translate(self.messageBoxCaptionId))
+end
+
+local function messageBox_positionReached(self, url, property)
+	if self.messageBoxVisible == false then
+		gui.set_enabled(self.messageBoxNode, false)
+	end
+end
+
+local function show_message(self, visible, captionId)
+	if self.messageBoxCaptionId ~= captionId and visible == true then
+		-- the caption should be changed 
+		self.messageBoxCaptionId = captionId
+		gui.set_text(gui.get_node("MessageBoxCaption"), translate(self.messageBoxCaptionId))
+	end
+	if visible == true and self.messageBoxVisible == false then
+		-- the message box should be visible but it is not yet 
+		gui.set_enabled(self.messageBoxNode, true)
+		gui.animate(self.messageBoxNode, "position.y", 568, gui.EASING_OUTBACK, 1, 0, messageBox_positionReached)
+		self.messageBoxVisible = true
+	elseif visible == false and self.messageBoxVisible == true then
+		-- the message box should be invisible but it is visible still 
+		gui.animate(self.messageBoxNode, "position.y", -120, gui.EASING_OUTBACK, 1, 0, messageBox_positionReached)
+		self.messageBoxVisible = false
+	end
+end
+
+function init(self)
+	self.active = true
+	self.stageStatus = hx.Undefined
+	self.messageBoxCaptionId = ""
+	self.messageBoxVisible = false 
+	self.messageBoxNode = gui.get_node("MessageBox")
+	gui.set_enabled(self.messageBoxNode, false)
+	msg.post(".", "acquire_input_focus")
+end
+
+function final(self)
+	msg.post(".", "release_input_focus")
+end
+
+function on_message(self, message_id, message, sender)
+--	print_message("StageScene", message_id, message)
+
+	if message_id == hash("show_info - stage_completed_firstresult") then
+		show_message(self, true, "Stage_Complete_FirstResult")
+		self.stageStatus = hash("stagecomplete")
+
+	elseif message_id == hash("show_info - stage_completed_with_improvement") then
+		show_message(self, true, "Stage_Complete_ResultImproved")
+		self.stageStatus = hash("stagecomplete")
+
+	elseif message_id == hash("show_info - stage_completed_no_improvement") then
+		show_message(self, true, "Stage_Complete_ResultNotImproved")
+		self.stageStatus = hash("stagecomplete")
+
+	elseif message_id == hash("show_info - stage_incomplete_no_improvement") then
+		show_message(self, true, "Stage_Incomplete_ResultNotImproved")
+		self.stageStatus = hash("stagecomplete")
+
+	elseif message_id == hash("show_info - stage_incomplete_no_result") then
+		show_message(self, true, "Stage_Incomplete_NoResult")
+		self.stageStatus = hash("stagecomplete")
+
+	elseif message_id == hash("main_languagechanged") then
+		refresh(self)
+	end
+end
+
+function on_input(self, action_id, action)
+	if action_id == hash("touch") and action.released and self.active then
+		if self.messageBoxVisible then
+			if self.stageStatus == hash("stagecomplete") then
+				msg.post("main:/UserInterface#MainMenu", "mainmenu - show")
+				msg.post("main:/SceneLoader#SceneLoader", "stage_scene - unload")
+			end
+		end
+	end
+end

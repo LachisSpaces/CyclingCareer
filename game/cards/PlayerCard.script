@@ -1,0 +1,160 @@
+
+local hx = require "scripts.hashes"
+
+go.property("teamAmount", 3)
+go.property("teamMaximum", 7)
+go.property("energyAmount", 4)
+go.property("energyMaximum", 4)
+go.property("attackAmount", 3)
+go.property("attackMaximum", 5)
+
+function refresh(self)
+	label.set_text("Stat1#Value", self.teamAmount .. " / " .. self.teamMaximum)
+	label.set_text("Stat1#Info", translate("PlayerCard_prefix_teammate"))
+	label.set_text("Stat2#Value", self.energyAmount .. " / " .. self.energyMaximum)
+	label.set_text("Stat2#Info", translate("PlayerCard_prefix_energy"))
+	label.set_text("Stat3#Value", self.attackAmount .. " / " .. self.attackMaximum)
+	label.set_text("Stat3#Info", translate("PlayerCard_prefix_attack"))
+end
+
+function init(self)
+	msg.post("main:/SceneLoader#SceneLoader", "stage_initialisation - need_initial_values")
+end
+
+function on_message(self, message_id, message, sender)
+--	print_message("PlayerCard", message_id, message)
+
+	if message_id == hash("stage_initialisation - initial_values") then
+		self.teamAmount = message.cyclistAttributes.values.team
+		self.teamMaximum = message.cyclistAttributes.maximum.team
+		self.energyAmount = message.cyclistAttributes.values.energy
+		self.energyMaximum = message.cyclistAttributes.maximum.energy
+		self.attackAmount = message.cyclistAttributes.values.attack
+		self.attackMaximum = message.cyclistAttributes.maximum.attack
+		refresh(self)
+
+	elseif message_id == hash("collecting_event_card - try_to_collect") then
+		-- an event card should be collected, but we check first (info of event card in message)
+		local cardInfo = message 
+		local cardCollected = false 
+		if cardInfo.cardType == hx.CardType_DNF then
+			-- the player wants to give up 
+			msg.post(sender, "collecting_event_card - give_up")
+			
+		elseif cardInfo.cardType == hx.CardType_Gain then
+			-- the event card is a positive card 
+			if cardInfo.statType == hx.StatType_Team then
+				-- the event card gives team support
+				self.teamAmount = math.min(self.teamAmount + cardInfo.value, self.teamMaximum)
+			elseif cardInfo.statType == hx.StatType_Energy then
+				-- the event card gives energy
+				self.energyAmount = math.min(self.energyAmount + cardInfo.value, self.energyMaximum)
+			elseif cardInfo.statType == hx.StatType_Attack then
+				-- the event card gives attack power
+				self.attackAmount = math.min(self.attackAmount + cardInfo.value, self.attackMaximum)
+			end
+			cardCollected = true
+
+		elseif cardInfo.cardType == hx.CardType_Loss then
+			-- the event card is a negative card 
+			local deduction = cardInfo.value
+			if cardInfo.statType == hx.StatType_Any or cardInfo.statType == hx.StatType_AnyExceptTeam then
+				-- the event card costs are not limited to one energy type 
+				local deductionStart = 1
+				if cardInfo.statType == hx.StatType_AnyExceptTeam then
+					-- team support cannot be used 
+					deductionStart = 2
+				end
+				if deductionStart <= 1 and deduction <= self.teamAmount then
+					-- reducing team support only  
+					self.teamAmount = self.teamAmount - deduction
+				else
+					-- reducing multiple energies 
+					if deductionStart <= 1 then
+						-- reducing all team support
+						deduction = deduction - self.teamAmount
+						self.teamAmount = 0
+					end
+					if deductionStart <= 2 and deduction <= self.energyAmount then
+						-- reducing energy only 
+						self.energyAmount = self.energyAmount - deduction
+					else
+						-- reducing multiple energies
+						if deductionStart <= 2 then
+							-- reducing all energy 
+							deduction = deduction - self.energyAmount
+							self.energyAmount = 0
+						end
+						if deduction <= self.attackAmount then
+							-- reducing some attack power
+							self.attackAmount = self.attackAmount - deduction
+						else
+							-- reducing all attack power
+							self.attackAmount = 0
+						end
+					end
+				end
+				cardCollected = true
+				
+			elseif cardInfo.statType == hx.StatType_Team then
+				-- the event card costs are limited to team support 
+				if cardInfo.value > self.teamAmount then
+					-- not enough teammates to collect the event card
+					msg.post(sender, "collecting_event_card - playercard_stats_insufficient", cardInfo)
+				else
+					-- enough teammates to collect the event card 
+					self.teamAmount = self.teamAmount - deduction
+					cardCollected = true
+				end
+				
+			elseif cardInfo.statType == hx.StatType_Energy then
+				-- the event card costs are limited to energy 
+				if cardInfo.value > self.energyAmount then
+					-- not enough energy to collect the event card
+					msg.post(sender, "collecting_event_card - playercard_stats_insufficient", cardInfo)
+				else
+					-- enough energy to collect the event card 
+					self.energyAmount = self.energyAmount - cardInfo.value
+					cardCollected = true
+				end
+				
+			elseif cardInfo.statType == hx.StatType_Attack then
+				-- the event card costs are limited to attack 
+				if cardInfo.value > self.attackAmount then
+					-- not enough attack to collect the event card 
+					msg.post(sender, "collecting_event_card - playercard_stats_insufficient", cardInfo)
+				else
+					-- enough attack to collect the event card 
+					self.attackAmount = self.attackAmount - cardInfo.value
+					cardCollected = true
+				end
+			end
+			
+			if self.energyAmount <= 0 and self.attackAmount <= 0 then
+				-- energy and attack power are used up
+				msg.post(sender, "collecting_event_card - energy_empty")
+			end
+		end
+
+		if cardCollected == true then
+			if cardInfo.bonusPoints > 0 then
+				-- the event card give bonus points 
+				if cardInfo.bonusType == hx.CardBonus_Sprint or cardInfo.bonusType == hx.CardBonus_SprintFinish then
+					-- the event card gives sprint points 
+					msg.post(sender, "collecting_event_card - won_bonus", { sprintPoints = cardInfo.bonusPoints })
+				end
+				if cardInfo.bonusType == hx.CardBonus_Mountain or cardInfo.bonusType == hx.CardBonus_MountainFinish then
+					-- the event card gives mountain points 
+					msg.post(sender, "collecting_event_card - won_bonus", { mountainPoints = cardInfo.bonusPoints })
+				end
+				if cardInfo.bonusType == hx.CardBonus_TimeLoss or cardInfo.bonusType == hx.CardBonus_TimeWin then
+					-- the event card increases/reduces time 
+					msg.post(sender, "collecting_event_card - time_bonus", { seconds = cardInfo.bonusPoints, bonusType = cardInfo.bonusType })
+				end
+			end
+			msg.post(sender, "collecting_event_card - collected", cardInfo) -- at the moment it is important that this code runs after won_bonus
+		end
+	end
+
+	refresh(self)
+end

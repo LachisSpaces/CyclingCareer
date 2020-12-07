@@ -1,0 +1,51 @@
+
+function init(self)
+	self.currentScene = "none"
+	self.initialValues = {}
+	msg.post(".", "acquire_input_focus") 
+end
+
+function final(self)
+	msg.post(".", "release_input_focus")
+end
+
+function on_message(self, message_id, message, sender)
+--	print_message("SceneLoader", message_id, message)
+	
+	if message_id == hash("race_scene - load") then
+		-- the race scene should be loaded
+		self.currentScene = "#Proxy_Race"
+		self.initialValues = message
+		self.loader = sender 
+		msg.post(self.currentScene, "load")
+
+	elseif message_id == hash("stage_scene - load") then
+		-- the stage scene should be loaded 
+		self.currentScene = "#Proxy_Stage"
+		self.initialValues = message
+		self.loader = sender 
+		msg.post(self.currentScene, "load")
+
+	elseif message_id == hash("proxy_loaded") then
+		-- generic response from proxy
+		msg.post(sender, "init")
+		msg.post(sender, "enable")
+		msg.post(self.loader, "scene - loaded")
+
+	elseif message_id == hash("race_scene - unload") or message_id == hash("stage_scene - unload") then
+		-- the scene should be unloaded
+		self.unloader = sender 
+		msg.post(self.currentScene, "disable")
+		msg.post(self.currentScene, "final")
+		msg.post(self.currentScene, "unload")
+
+	elseif message_id == hash("proxy_unloaded") then
+		-- generic response from proxy
+		--msg.post(self.unloader, "scene - unloaded") -- not possible because unload is called from the scene
+
+	elseif message_id == hash("stage_initialisation - need_initial_values") then
+		-- the stage needs the initial values 
+		msg.post(sender, "stage_initialisation - initial_values", self.initialValues)
+
+	end
+end

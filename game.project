@@ -1,8 +1,10 @@
 [project]
 title = CyclingCareer
+version = 0.4.103
 
 [bootstrap]
-main_collection = /main/main.collectionc
+main_collection = /game/main/main.collectionc
+render = /assets/render/orthographic.renderc
 
 [input]
 game_binding = /input/game.input_bindingc
@@ -59,4 +61,17 @@ shared_state = 1
 [physics]
 gravity_y = -1000.0
 scale = 0.01
+
+[tracking]
+app_id = 7F8B2F5C1E3E1F0B
+
+[label]
+max_count = 160
+
+[html5]
+scale_mode = no_scale
+
+[graphics]
+default_texture_min_filter = linear
+default_texture_mag_filter = linear
 

@@ -1,0 +1,418 @@
+
+local hx = require "scripts.hashes"
+local raceDefinition = require "scripts.RaceDefinition"
+
+local function stage_getDefaultProperties(stageIndex)
+	local stageDefinition = { }
+	return { stageIndex = stageIndex, complete = false, stage_seconds = 0, stage_sprintPoints = 0, stage_mountainPoints = 0, overall_seconds = 0, overall_sprintPoints = 0, overall_mountainPoints = 0, stageDefinition = stageDefinition }
+end
+
+local function race_calculateOverall(self)
+	local overallSeconds = 0
+	local overallSprintPoints = 0
+	local overallMountainPoints = 0
+	local selectedCyclist = self.cyclistStatistics.cyclists[self.cyclistStatistics.selectedCyclist]
+	local race = selectedCyclist.races[selectedCyclist.selectedRace]
+	for stageIndex = 1, 14 do
+		local stageProperties = race.stages[stageIndex]
+		if stageProperties == nil then
+			-- this stage does not exists in the race 
+		else
+			-- the stage exists
+			stageProperties.overall_seconds = overallSeconds
+			stageProperties.overall_sprintPoints = overallSprintPoints
+			stageProperties.overall_mountainPoints = overallMountainPoints
+			race.stages[stageIndex] = stageProperties
+			if stageProperties.complete then
+				overallSeconds = overallSeconds + stageProperties.stage_seconds
+				overallSprintPoints = overallSprintPoints + stageProperties.stage_sprintPoints
+				overallMountainPoints = overallMountainPoints + stageProperties.stage_mountainPoints
+			end
+		end
+	end
+	selectedCyclist.races[selectedCyclist.selectedRace] = race
+	self.cyclistStatistics.cyclists[self.cyclistStatistics.selectedCyclist] = selectedCyclist
+end
+
+local function refresh(self)
+	gui.set_text(gui.get_node("ProjectVersion"), "v" .. sys.get_config("project.version"))
+
+	gui.set_text(gui.get_node("GameTitle_Caption"), translate("GameTitle"))
+
+	if self.visiblePage == hx.MainMenu_Page_Cyclist then
+		gui.set_text(gui.get_node("CyclistSelection"), translate("MainMenu_CyclistSelection"))
+		
+	elseif self.visiblePage == hx.MainMenu_Page_Race then
+		local stageIndexMax = 0
+		local overallSeconds = 0
+		local overallSprintPoints = 0
+		local overallMountainPoints = 0
+		local selectedCyclist = self.cyclistStatistics.cyclists[self.cyclistStatistics.selectedCyclist]
+		local race = selectedCyclist.races[selectedCyclist.selectedRace]
+--		print_table(race)
+		for stageIndex = 1, 14 do
+			local stageProperties = race.stages[stageIndex]
+--			print_table(stageProperties)
+			local node = gui.get_node("Selection_Stage" .. stageIndex)
+			if stageProperties == nil then
+				-- this stage does not exist in the race
+				gui.set_enabled(node, false)
+			else
+				-- the stage does exist
+				gui.set_enabled(node, true)
+				if stageProperties.complete then
+					overallSeconds = overallSeconds + stageProperties.stage_seconds
+					overallSprintPoints = overallSprintPoints + stageProperties.stage_sprintPoints
+					overallMountainPoints = overallMountainPoints + stageProperties.stage_mountainPoints
+					gui.play_flipbook(node, "IconGreen")
+					if stageIndexMax < stageIndex then
+						stageIndexMax = stageIndex
+					end
+				elseif stageIndex <= stageIndexMax + 1 then
+					gui.play_flipbook(node, "IconBlue")
+				else
+					gui.play_flipbook(node, "IconRed")
+				end
+
+				if stageProperties.stageDefinition.profile == hx.StageDefinition_ProfileFlat then
+					gui.play_flipbook(gui.get_node("Selection_Stage" .. stageIndex .. "_Profile"), "IconFlat")
+				elseif stageProperties.stageDefinition.profile == hx.StageDefinition_ProfileHill then
+					gui.play_flipbook(gui.get_node("Selection_Stage" .. stageIndex .. "_Profile"), "IconHill")
+				elseif stageProperties.stageDefinition.profile == hx.StageDefinition_ProfileMountain then
+					gui.play_flipbook(gui.get_node("Selection_Stage" .. stageIndex .. "_Profile"), "IconMountain")
+				else
+					gui.play_flipbook(gui.get_node("Selection_Stage" .. stageIndex .. "_Profile"), "IconEmpty")
+				end
+
+				if stageProperties.stageDefinition.weather == hx.StageDefinition_WeatherSun then
+					gui.play_flipbook(gui.get_node("Selection_Stage" .. stageIndex .. "_Weather"), "IconSun")
+				elseif stageProperties.stageDefinition.weather == hx.StageDefinition_WeatherRain then
+					gui.play_flipbook(gui.get_node("Selection_Stage" .. stageIndex .. "_Weather"), "IconRain")
+				elseif stageProperties.stageDefinition.weather == hx.StageDefinition_WeatherWind then
+					gui.play_flipbook(gui.get_node("Selection_Stage" .. stageIndex .. "_Weather"), "IconWind")
+				elseif stageProperties.stageDefinition.weather == hx.StageDefinition_WeatherHeat then
+					gui.play_flipbook(gui.get_node("Selection_Stage" .. stageIndex .. "_Weather"), "IconHeat")
+				elseif stageProperties.stageDefinition.weather == hx.StageDefinition_WeatherCold then
+					gui.play_flipbook(gui.get_node("Selection_Stage" .. stageIndex .. "_Weather"), "IconCold")
+				else
+					gui.play_flipbook(gui.get_node("Selection_Stage" .. stageIndex .. "_Weather"), "IconEmpty")
+				end
+
+				gui.set_text(gui.get_node("Selection_Stage" .. stageIndex .. "_Caption"), translate("MainMenu_StageSelection") .. stageIndex)
+			end
+	end
+
+		gui.set_text(gui.get_node("Stat1_Info"), translate("MainMenu_Stat1"))
+		gui.set_text(gui.get_node("Stat2_Info"), translate("MainMenu_Stat2"))
+		gui.set_text(gui.get_node("Stat3_Info"), translate("MainMenu_Stat3"))
+		gui.set_text(gui.get_node("Stat1_Value"), fornat_time(overallSeconds))
+		gui.set_text(gui.get_node("Stat2_Value"), overallSprintPoints)
+		gui.set_text(gui.get_node("Stat3_Value"), overallMountainPoints)
+	end
+
+	gui.set_text(gui.get_node("MessageBoxCaption"), translate(self.messageBoxCaptionId))
+end
+
+local function messageBox_positionReached(self, url, property)
+	if self.messageBoxVisible == false then
+		gui.set_enabled(self.messageBoxNode, false)
+	end
+end
+
+local function cyclistPage_positionReached(self, url, property)
+	if self.visiblePage ~= hx.MainMenu_Page_Cyclist then
+		gui.set_enabled(self.cyclistPageNode, false)
+	end
+end
+
+local function racePage_positionReached(self, url, property)
+	if self.visiblePage ~= hx.MainMenu_Page_Race then
+		gui.set_enabled(self.racePageNode, false)
+	end
+end
+
+local function show_message(self, visible, captionId)
+	if self.messageBoxCaptionId ~= captionId and visible == true then
+		-- the caption should be changed 
+		self.messageBoxCaptionId = captionId
+		gui.set_text(gui.get_node("MessageBoxCaption"), translate(self.messageBoxCaptionId))
+	end
+	if visible == true and self.messageBoxVisible == false then
+		-- the message box should be visible but it is not yet 
+		gui.set_enabled(self.messageBoxNode, true)
+		gui.animate(self.messageBoxNode, "position.y", 568, gui.EASING_OUTBACK, 0.5, 0, messageBox_positionReached)
+		self.messageBoxVisible = true
+	elseif visible == false and self.messageBoxVisible == true then
+		-- the message box should be invisible but it is visible still 
+		gui.animate(self.messageBoxNode, "position.y", -120, gui.EASING_OUTBACK, 0.5, 0, messageBox_positionReached)
+		self.messageBoxVisible = false
+	end
+end
+
+local function show_cyclistPage(self, visible)
+	if visible == true and self.visiblePage ~= hx.MainMenu_Page_Cyclist then
+		-- the cyclist page should be visible but it is not yet 
+		if self.visiblePage == hx.MainMenu_Page_Race then
+			-- the other page is visible 
+			gui.animate(self.racePageNode, "position.x", 960, gui.EASING_OUTBACK, 0.3, 0, racePage_positionReached)
+		end
+		gui.set_enabled(self.cyclistPageNode, true)
+		gui.animate(self.cyclistPageNode, "position.x", 320, gui.EASING_OUTBACK, 0.4, 0, cyclistPage_positionReached)
+		self.visiblePage = hx.MainMenu_Page_Cyclist
+	elseif visible == false and self.visiblePage == hx.MainMenu_Page_Cyclist then
+		-- the cyclist page should be invisible but it is visible still (consider using show_racePage instead) 
+		gui.animate(self.cyclistPageNode, "position.x", -320, gui.EASING_OUTBACK, 0.3, 0, cyclistPage_positionReached)
+		self.visiblePage = hx.MainMenu_Page_None
+	end
+end
+
+local function show_racePage(self, visible)
+	if visible == true and self.visiblePage ~= hx.MainMenu_Page_Race then
+		-- the race page should be visible but it is not yet 
+		if self.visiblePage == hx.MainMenu_Page_Cyclist then
+			-- the other page is visible 
+			gui.animate(self.cyclistPageNode, "position.x", -320, gui.EASING_OUTBACK, 0.3, 0, cyclistPage_positionReached)
+		end
+		gui.set_enabled(self.racePageNode, true)
+		gui.animate(self.racePageNode, "position.x", 320, gui.EASING_OUTBACK, 0.4, 0, racePage_positionReached)
+		self.visiblePage = hx.MainMenu_Page_Race
+		race_calculateOverall(self)
+		refresh(self)
+	elseif visible == false and self.visiblePage == hx.MainMenu_Page_Race then
+		-- the cyclist page should be invisible but it is visible still (consider using show_racePage instead) 
+		gui.animate(self.racePageNode, "position.x", 960, gui.EASING_OUTBACK, 0.3, 0, racePage_positionReached)
+		self.visiblePage = hx.MainMenu_Page_None
+	end
+end
+
+local function race_reset()
+	local races = {}
+	-- ToBeDone: Loop over the races
+	local stages = {}
+	local stagesTdS = raceDefinition.race_getStages("TourDeSuisse")
+	local stageCount = #stagesTdS
+	for stageIndex = 1, stageCount do
+		local stageProperties = stage_getDefaultProperties(stageIndex)
+		stageProperties.stageDefinition = stagesTdS[stageIndex]
+		stages[stageIndex] = stageProperties
+	end
+	local race = { index = 1, id = hash("TourDeSuisse"), stages = stages }
+	races[1] = race
+	return races
+end
+
+local function stats_reset(self)
+	self.cyclistStatistics = {}
+	self.cyclistStatistics.project = { projectversion = sys.get_config("project.version") }
+	self.cyclistStatistics.selectedCyclist = 0
+
+	local cyclists = {}
+	for cyclistIndex = 1, 3 do
+		local values = { team = 0/0, energy = 0/0, attack = 0/0 }
+		local maximum = { team = 0/0, energy = 0/0, attack = 0/0 }
+		if cyclistIndex == 1 then
+			cyclistName = "Hirschi, Marc"
+			values.team = 3
+			maximum.team = 3
+			values.energy = 3
+			maximum.energy = 3
+			values.attack = 3
+			maximum.attack = 3
+		elseif cyclistIndex == 2 then
+			cyclistName = "Frank, Mathias"
+			values.team = 4
+			maximum.team = 5
+			values.energy = 5
+			maximum.energy = 5
+			values.attack = 2
+			maximum.attack = 3
+		elseif cyclistIndex == 3 then
+			cyclistName = "Bernal, Egan"
+			values.team = 5
+			maximum.team = 7
+			values.energy = 4
+			maximum.energy = 4
+			values.attack = 3
+			maximum.attack = 5
+		end
+		local attributes = { values = values, maximum = maximum }
+		local races = race_reset()
+		local cyclist = { name = cyclistName, attributes = attributes, races = races, selectedRace = 1 }
+		cyclists[cyclistIndex] = cyclist
+	end
+	self.cyclistStatistics.cyclists = cyclists
+	--print_table(self.cyclistStatistics.cyclists[3])
+end
+
+function init(self)
+	self.active = false
+	self.messageBoxCaptionId = ""
+	self.messageBoxVisible = false 
+	self.messageBoxNode = gui.get_node("MessageBox")
+	self.cyclistPageNode = gui.get_node("CyclistPage")
+	self.racePageNode = gui.get_node("RacePage")
+	self.visiblePage = hx.MainMenu_Page_None
+	-- reset the menu
+	gui.set_enabled(self.messageBoxNode, false)
+	gui.set_enabled(self.cyclistPageNode, false)
+	gui.set_enabled(self.racePageNode, false)
+	-- Load the game
+	local savePath = sys.get_save_file("CyclingCardGame", "SaveGame")
+	local saveGame = sys.load(savePath)
+	if not next(saveGame) then
+		-- 
+		stats_reset(self)
+		show_message(self, true, "General_SaveIsEmpty")
+	else
+		local projectInfo = saveGame["project"]
+		local saveGameNeedsReset = false 
+		local oldVersion = nil
+		if projectInfo ~= nil then
+			-- some project info is stored in the save
+			oldVersion = projectInfo["projectversion"]
+		end
+		if oldVersion == nil then
+			-- no project info or no project number
+			saveGameNeedsReset = true 
+		else
+			-- the project number exists in the save
+			local projectversion = sys.get_config("project.version")
+			if string.sub(oldVersion, 1, 2) ~= string.sub(projectversion, 1, 2) then
+				-- The first section of the project number changed 
+				saveGameNeedsReset = true  -- New version 
+			elseif string.sub(oldVersion, 3, 4) ~= string.sub(projectversion, 3, 4) then
+				-- The second section of the project number changed 
+				saveGameNeedsReset = true  -- Major changes
+			end
+		end
+		if saveGameNeedsReset == true then
+			-- the save has to be reset
+			stats_reset(self)
+			show_message(self, true, "General_NewMajorRelease")
+		else
+			-- the save is fine
+			self.cyclistStatistics = saveGame
+		end
+	end
+	show_cyclistPage(self, true)
+	-- Show the menu
+	msg.post("#", "mainmenu - show")
+	msg.post(".", "acquire_input_focus")
+end
+
+function final(self)
+	msg.post(".", "release_input_focus")
+end
+
+function on_message(self, message_id, message, sender)
+--	print_message("MainMenu", message_id, message)
+
+	if message_id == hash("mainmenu - show") then
+		msg.post("#", "enable")
+		self.active = true
+
+	elseif message_id == hash("mainmenu - hide") then
+		msg.post("#", "disable")
+		self.active = false
+
+	elseif message_id == hash("language - has_changed") then
+		-- the language has changed >> refresh is needed 
+
+	elseif message_id == hash("actual_stage - terminated") then
+		-- the stage is over (the message contains the stage information)
+		local selectedCyclist = self.cyclistStatistics.cyclists[self.cyclistStatistics.selectedCyclist]
+		local race = selectedCyclist.races[selectedCyclist.selectedRace]
+		race.stages[message.stageIndex] = message
+		selectedCyclist.races[selectedCyclist.selectedRace] = race
+		self.cyclistStatistics.cyclists[self.cyclistStatistics.selectedCyclist] = selectedCyclist
+		race_calculateOverall(self)
+		local savePath = sys.get_save_file("CyclingCardGame", "SaveGame")
+		if not sys.save(savePath, self.cyclistStatistics) then
+			show_message(self, true, "General_UnableToSave")
+		end
+
+	end
+	refresh(self)
+end
+
+function on_input(self, action_id, action)
+	if action_id == hx.Action_Touch and action.released and self.active then
+		local lngEng = gui.get_node("Button_Language_EN")
+		local lngGer = gui.get_node("Button_Language_DE")
+		local reset = gui.get_node("Reset")
+		local back = gui.get_node("Back")
+
+		-- check language changes no matter if message box is visible or not 
+		if gui.pick_node(lngEng, action.x, action.y) then
+			msg.post("/Main", "language - change", { language = "en" } )
+			return true 
+		elseif gui.pick_node(lngGer, action.x, action.y) then
+			msg.post("/Main", "language - change", { language = "de" } )
+			return true 
+		end
+
+		if self.messageBoxVisible then
+			-- the messsage box is visible >> hide it first
+			show_message(self, false, "")
+			
+		elseif self.visiblePage == hx.MainMenu_Page_Cyclist then
+			-- the cyclist selection is visible 
+			for cyclistIndex = 1, 3 do
+				if gui.pick_node(gui.get_node("Cyclist" .. cyclistIndex), action.x, action.y) then
+					self.cyclistStatistics.selectedCyclist = cyclistIndex
+					show_racePage(self, true)
+					return true
+				end
+			end
+
+		elseif self.visiblePage == hx.MainMenu_Page_Race then
+			-- the race page is visible
+			if gui.pick_node(back, action.x, action.y) then
+				show_cyclistPage(self, true)
+			end
+			local stageIndexMax = 0
+			local selectedCyclist = self.cyclistStatistics.cyclists[self.cyclistStatistics.selectedCyclist]
+			local race = selectedCyclist.races[selectedCyclist.selectedRace]
+			for stageIndex = 1, 14 do
+				local stageProperties = race.stages[stageIndex]
+				if stageProperties == nil then
+					-- this stage does not exist in the race 
+				else
+					-- the stage exists
+					if stageProperties.complete then
+						-- already played
+						if stageIndexMax < stageIndex then
+							stageIndexMax = stageIndex
+						end
+					end
+					local initialValues = { stageProperties = stageProperties, cyclistAttributes = selectedCyclist.attributes }
+					if gui.pick_node(gui.get_node("Selection_Stage" .. stageIndex), action.x, action.y) or gui.pick_node(gui.get_node("Selection_Stage" .. stageIndex .. "_Caption"), action.x, action.y) then
+						if stageIndex == stageIndexMax + 1 then  
+							-- the next stage 
+							msg.post("/SceneLoader#SceneLoader", "stage_scene - load", initialValues)
+							msg.post("#", "mainmenu - hide")
+						elseif stageIndex > stageIndexMax then
+							-- not allowed yet
+							msg.post("/SceneLoader#SceneLoader", "stage_scene - load", initialValues)
+							msg.post("#", "mainmenu - hide")
+							--show_message(self, true, "General_StageNotReached")
+						else
+							-- already played
+							msg.post("/SceneLoader#SceneLoader", "stage_scene - load", initialValues)
+							msg.post("#", "mainmenu - hide")
+							--show_message(self, true, "General_StageCompletedAlready")
+						end
+					end
+				end
+			end
+			if gui.pick_node(reset, action.x, action.y) then
+				local races = race_reset()
+				local selectedCyclist = self.cyclistStatistics.cyclists[self.cyclistStatistics.selectedCyclist]
+				selectedCyclist.races = races 
+				self.cyclistStatistics.cyclists[self.cyclistStatistics.selectedCyclist] = selectedCyclist
+				refresh(self)
+			end
+		end
+
+	end
+end

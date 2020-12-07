@@ -1,0 +1,60 @@
+
+go.property("hidden", false)
+
+local _color_black = vmath.vector4(0, 0, 0, 1)
+local _color_sprint = vmath.vector4(0, 0.5, 0, 1)
+local _color_mountain = vmath.vector4(0.768, 0, 0, 1)
+
+local function refresh(self)
+	if self.hidden == true then
+		msg.post("Face", "disable")
+		msg.post("Stat1", "disable")
+		msg.post("Stat2", "disable")
+		msg.post("Stat3", "disable")
+	else
+		msg.post("Face", "enable")
+		msg.post("Stat1", "enable")
+		msg.post("Stat2", "enable")
+		msg.post("Stat3", "enable")
+		label.set_text("Stat1#Values", fornat_time(self.seconds))
+		go.set("Stat1#Values", "color", _color_black)
+		label.set_text("Stat1#Info", translate("ResultCard_prefix_time"))
+		go.set("Stat1#Info", "color", _color_black)
+		label.set_text("Stat2#Values", self.sprintPoints)
+		go.set("Stat2#Values", "color", _color_sprint)
+		label.set_text("Stat2#Info", translate("ResultCard_prefix_sprint"))
+		go.set("Stat2#Info", "color", _color_sprint)
+		label.set_text("Stat3#Values", self.mountainPoints)
+		go.set("Stat3#Values", "color", _color_mountain)
+		label.set_text("Stat3#Info", translate("ResultCard_prefix_mountain"))
+		go.set("Stat3#Info", "color", _color_mountain)
+	end
+end
+
+function init(self)
+	self.seconds = 0
+	self.sprintPoints = 0
+	self.mountainPoints = 0
+	refresh(self)
+end
+
+function on_message(self, message_id, message, sender)
+--	print_message("ResultCard", message_id, message)
+
+	if message_id == hash("resultcard - show") then
+		self.hidden = false 
+		refresh(self)
+
+	elseif message_id == hash("resultcard - hide") then
+		self.hidden = true
+		refresh(self)
+
+	elseif message_id == hash("resultcard - update") then
+		self.seconds = message.seconds
+		self.sprintPoints = message.sprintPoints
+		self.mountainPoints = message.mountainPoints
+		refresh(self)
+		msg.post(sender, "resultcard - updated")
+
+	end
+end

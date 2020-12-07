@@ -1,0 +1,229 @@
+
+local hx = require "scripts.hashes"
+
+go.property("cardType", hash("undefined"))
+go.property("statType", hash("undefined"))
+go.property("class", hash("undefined"))
+go.property("value", 0)
+go.property("bonusType", hash("undefined"))
+go.property("bonusPoints", 0)
+go.property("hidden", false)
+
+--local _color_black = vmath.vector4(0.2, 0.2, 0.2, 1)
+--local _color_yellow = vmath.vector4(1, 0.83, 0, 1)
+local _color_silver = vmath.vector4(0.9, 0.9, 0.9, 1)
+local _color_red = vmath.vector4(0.76, 0, 0, 1)
+local _color_green = vmath.vector4(0, 0.5, 0, 1)
+local _color_darkred = vmath.vector4(0.6, 0, 0, 0.8)
+local _color_darkblue = vmath.vector4(0, 0.1, 0.4, 0.8)
+
+local function refresh(self)
+	if self.hidden then
+		msg.post("Face", "disable")
+		msg.post("Info", "disable")
+		msg.post("Stat1", "disable")
+		msg.post("Bonus", "disable")
+		msg.post("BonusType", "disable")
+		msg.post("BonusValue", "disable")
+
+	else
+		if self.class == hx.Undefined or self.class == hx.CardClass_None then
+			msg.post("Face", "enable")
+			msg.post("Info", "disable")
+			msg.post("Stat1", "disable")
+			msg.post("Bonus", "disable")
+			msg.post("BonusType", "disable")
+			msg.post("BonusValue", "disable")
+		else
+			msg.post("Face", "enable")
+			msg.post("Info", "enable")
+			msg.post("Stat1", "enable")
+			go.set("Stat1#Type", "color", _color_silver)
+			go.set("Stat1#Value", "color", _color_silver)
+
+			local classSprite = hash("CardClass_None")
+			if self.class == hx.CardClass_Bidon then 
+				label.set_text("Info#Title", translate("EventCard_bidon"))
+				classSprite = hash("CardClass_Bidon")
+			elseif self.class == hx.CardClass_Food then 
+				label.set_text("Info#Title", translate("EventCard_food"))
+				classSprite = hash("CardClass_Food")
+			elseif self.class == hx.CardClass_Gel then 
+				label.set_text("Info#Title", translate("EventCard_gel"))
+				classSprite = hash("CardClass_EnergyGel")
+			elseif self.class == hx.CardClass_TeamMate then 
+				label.set_text("Info#Title", translate("EventCard_teammate"))
+				classSprite = hash("CardClass_TeamMate")
+			elseif self.class == hx.CardClass_FlatTire then 
+				label.set_text("Info#Title", translate("EventCard_flattire"))
+				classSprite = hash("CardClass_FlatTire")
+			elseif self.class == hx.CardClass_Cobbles then 
+				label.set_text("Info#Title", translate("EventCard_cobbles"))
+			elseif self.class == hx.CardClass_Crosswind then
+				label.set_text("Info#Title", translate("EventCard_crosswind"))
+			elseif self.class == hx.CardClass_Wind then
+				label.set_text("Info#Title", translate("EventCard_wind"))
+			elseif self.class == hx.CardClass_Rain then 
+				label.set_text("Info#Title", translate("EventCard_rain"))
+			elseif self.class == hx.CardClass_Cold then 
+				label.set_text("Info#Title", translate("EventCard_cold"))
+				classSprite = hash("CardClass_Cold")
+			elseif self.class == hx.CardClass_Snow then
+				label.set_text("Info#Title", translate("EventCard_snow"))
+			elseif self.class == hx.CardClass_Heat then 
+				label.set_text("Info#Title", translate("EventCard_heat"))
+				classSprite = hash("CardClass_Heat")
+			elseif self.class == hx.CardClass_Hill then
+				label.set_text("Info#Title", translate("EventCard_hill"))
+				classSprite = hash("CardClass_Hill")
+			elseif self.class == hx.CardClass_Climb then 
+				label.set_text("Info#Title", translate("EventCard_climb"))
+				classSprite = hash("CardClass_Climb")
+			elseif self.class == hx.CardClass_Acceleration then 
+				label.set_text("Info#Title", translate("EventCard_acceleration"))
+				classSprite = hash("CardClass_Acceleration")
+			elseif self.class == hx.CardClass_Hunger then 
+				label.set_text("Info#Title", translate("EventCard_hunger"))
+				classSprite = hash("CardClass_Hunger")
+			elseif self.class == hx.CardClass_Thirst then
+				label.set_text("Info#Title", translate("EventCard_thirst"))
+				classSprite = hash("CardClass_Thirst")
+			elseif self.class == hx.CardClass_Attack then 
+				label.set_text("Info#Title", translate("EventCard_attack"))
+			elseif self.class == hx.CardClass_SprintTrain then 
+				label.set_text("Info#Title", translate("EventCard_sprinttrain"))
+			elseif self.class == hx.CardClass_TeamCar then 
+				label.set_text("Info#Title", translate("EventCard_teamcar"))
+			elseif self.class == hx.CardClass_Sprint then 
+				label.set_text("Info#Title", translate("EventCard_sprint"))
+			elseif self.class == hx.CardClass_Relax then 
+				label.set_text("Info#Title", translate("EventCard_relax"))
+			elseif self.class == hx.CardClass_Crash then
+				label.set_text("Info#Title", translate("EventCard_crash"))
+			elseif self.class == hx.CardClass_DNF then 
+				label.set_text("Info#Title", translate("EventCard_dnf"))
+			end	
+			msg.post("Info#sprite", "play_animation", { id = classSprite})
+			
+			if self.cardType == hx.CardType_Gain then
+				local prefix = "none"
+				if self.statType == hx.StatType_Team then
+					prefix = "teammate"
+				elseif self.statType == hx.StatType_Energy then
+					prefix = "energy"
+				elseif self.statType == hx.StatType_Attack then
+					prefix = "attack"
+				end
+				if self.value <= 0 then
+					label.set_text("Stat1#Type", "")
+					label.set_text("Stat1#Value", "")
+				else
+					label.set_text("Stat1#Type", translate("EventCard_prefix_" .. prefix))
+					label.set_text("Stat1#Value", self.value)
+				end
+				go.set("Info#Title", "color", _color_darkblue)
+				msg.post("Stat1#Loss", "disable")
+				msg.post("Stat1#Gain", "enable")
+
+			elseif self.cardType == hx.CardType_Loss then
+				local prefix = "none"
+				if self.statType == hx.StatType_Any then
+					prefix = "any"
+				elseif self.statType == hx.StatType_AnyExceptTeam then
+					prefix = "energy"
+				elseif self.statType == hx.StatType_Team then
+					prefix = "teammate"
+				elseif self.statType == hx.StatType_Energy then
+					prefix = "energy"
+				elseif self.statType == hx.StatType_Attack then
+					prefix = "attack"
+				end
+				if self.value == 0 then
+					label.set_text("Stat1#Type", "")
+					label.set_text("Stat1#Value", "")
+				else
+					label.set_text("Stat1#Type", translate("EventCard_prefix_" .. prefix))
+					label.set_text("Stat1#Value", self.value)
+				end
+				go.set("Info#Title", "color", _color_darkred)
+				msg.post("Stat1#Gain", "disable")
+				msg.post("Stat1#Loss", "enable")
+
+			elseif self.cardType == hx.CardClass_DNF then
+				msg.post("Stat1", "disable")
+
+			else
+				-- Andere Kartenarten hier implementieren
+			end
+			
+			if self.bonusPoints > 0 then
+				msg.post("Bonus", "enable")
+				msg.post("BonusType", "enable")
+				msg.post("BonusValue", "enable")
+				if self.bonusType == hx.CardBonus_TimeLoss or self.bonusType == hx.CardBonus_TimeWin then
+					local suffix = "second"
+					if self.bonusType == hx.CardBonus_TimeWin then
+						go.set("BonusType#Type", "color", _color_darkblue)
+						go.set("BonusValue#Value", "color", _color_darkblue)
+					else
+						go.set("BonusType#Type", "color", _color_darkred)
+						go.set("BonusValue#Value", "color", _color_darkred)
+					end
+					go.set_position(vmath.vector3(-8, 71, 0), "BonusType")
+					go.set_position(vmath.vector3(-39, 71, 0), "BonusValue")
+					label.set_text("BonusType#Type",  translate("EventCard_suffix_" .. suffix))
+					label.set_text("BonusValue#Value",  self.bonusPoints)
+				else
+					if self.bonusType == hx.CardBonus_Mountain or self.bonusType == hx.CardBonus_MountainFinish then
+						prefix = "mountain"
+						go.set("BonusType#Type", "color", _color_red)
+						go.set("BonusValue#Value", "color", _color_red)
+					elseif self.bonusType == hx.CardBonus_Sprint or self.bonusType == hx.CardBonus_SprintFinish then
+						prefix = "sprint"
+						go.set("BonusType#Type", "color", _color_green)
+						go.set("BonusValue#Value", "color", _color_green)
+					else
+						prefix = "none"
+					end
+					go.set_position(vmath.vector3(-47, 71, 0), "BonusType")
+					go.set_position(vmath.vector3(-15, 71, 0), "BonusValue")
+					label.set_text("BonusType#Type", translate("EventCard_prefix_" .. prefix))
+					label.set_text("BonusValue#Value", self.bonusPoints)
+				end
+			else
+				msg.post("Bonus", "disable")
+				msg.post("BonusType", "disable")
+				msg.post("BonusValue", "disable")
+			end
+		end
+	end
+end
+
+function init(self)
+	refresh(self)
+end
+
+function on_message(self, message_id, message, sender)
+--	print_message("eventcard", message_id, message)
+
+	if message_id == hash("eventcard - hide") then
+		self.hidden = true 
+		refresh(self)
+		msg.post(sender, "eventcard - hidden")
+
+	elseif message_id == hash("eventcard - replace") then
+		if message.cardType == hx.CardType_None then
+			self.hidden = true 
+		else
+			self.hidden = false
+		end
+		self.cardType = message.cardType
+		self.statType = message.statType
+		self.class = message.class
+		self.value = message.value
+		self.bonusType = message.bonusType
+		self.bonusPoints = message.bonusPoints
+		refresh(self)
+		msg.post(sender, "eventcard - replaced")
+	end
+end
